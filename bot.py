@@ -19,6 +19,7 @@ CHANNEL_JOIN_URL = "https://t.me/pemersatubangsa13868"
 # Daftar konten yang akan dikirim SESUDAH join (tambah file_id baru di sini)
 FILE_IDS = [
     "AgACAgUAAxkBAAN3aOIv1uuLkn96kWkJ6tF0Qcst7kcAAlAMaxuuWhFXY5A63iHcezABAAMCAAN4AAM2BA",
+    "AgACAgUAAxkBAAOBaOJFbIZvqFO5hzpXEmoayF4zeK0AAh8LaxuuWhlXxyDFA-MZjn8BAAMCAAN4AAM2BA",
 ]
 
 # --- LOGGING ---

@@ -120,7 +120,7 @@ async def joined_pressed(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 logger.warning(f"Gagal kirim konten awal ke {user.id}: {e}")
         _append_id(INIT_SENT_FILE, user.id)
 
-    await cq.message.reply_text("🔥 Terima kasih sudah join! Konten baru akan dikirim otomatis setiap 2 jam 💕")
+    await cq.message.reply_text("🔥 Terima kasih sudah join! selamat bergabung di channel PEMERSATU BANGSA 💕")
 
 
 # ===== Auto broadcast 6× sehari =====

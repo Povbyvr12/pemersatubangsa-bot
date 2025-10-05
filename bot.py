@@ -1,18 +1,17 @@
-import os
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 
-BOT_TOKEN = os.getenv("BOT_TOKEN")
-CHANNEL_ID = os.getenv("CHANNEL_ID")
+BOT_TOKEN = "8093048850:AAHFyMUXZKlawgJzoTJg89g06uUuUpLBn78"
+CHANNEL_ID = "pemersatubangsa168138"  # ganti dengan username channel kamu (tanpa @)
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "Halo! 👋 Untuk lihat file & konten terbaru, pastikan sudah join channel resmi kami dulu ya 💕"
+        "Halo! 🔥 Untuk lihat file & konten terbaru, pastikan sudah join channel resmi kami dulu ya 💕"
     )
 
 async def join(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        f"Klik link ini untuk join channel resmi kami 🔥\n\n👉 https://t.me/{CHANNEL_ID}"
+        f"Klik link ini untuk join channel resmi kami 👇\n\n🔥 https://t.me/{CHANNEL_ID}"
     )
 
 app = ApplicationBuilder().token(BOT_TOKEN).build()

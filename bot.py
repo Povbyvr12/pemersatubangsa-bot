@@ -1,9 +1,16 @@
+import logging
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 
-# === ISI TOKEN & CHANNEL DI SINI ===
+# === GANTI SESUAI PUNYA KAMU ===
 BOT_TOKEN = "8093048850:AAHFyMUXZKlawgJzoTJg89g06uUuUpLBn78"
 CHANNEL_ID = "pemersatubangsa13868"  # tanpa @
+
+logging.basicConfig(
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    level=logging.INFO,
+)
+logger = logging.getLogger(__name__)
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
@@ -15,16 +22,19 @@ async def join(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"Klik link ini untuk join channel resmi kami 👇\n\n🔥 https://t.me/{CHANNEL_ID}"
     )
 
-# Hapus webhook dulu supaya polling tidak konflik (409)
 async def on_startup(app):
-    await app.bot.delete_webhook(drop_pending_updates=True)
+    try:
+        await app.bot.delete_webhook(drop_pending_updates=True)
+        logger.info("Webhook removed, starting polling…")
+    except Exception:
+        logger.exception("Gagal delete_webhook")
 
-app = ApplicationBuilder().token(BOT_TOKEN).build()
-app.add_handler(CommandHandler("start", start))
-app.add_handler(CommandHandler("join", join))
-
-# Pastikan webhook dibersihkan saat inisialisasi
-app.post_init = on_startup
+def main():
+    app = ApplicationBuilder().token(BOT_TOKEN).build()
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("join", join))
+    app.post_init = on_startup
+    app.run_polling(allowed_updates=Update.ALL_TYPES)
 
 if __name__ == "__main__":
-    app.run_polling(allowed_updates=Update.ALL_TYPES)
+    main()

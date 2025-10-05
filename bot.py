@@ -3,9 +3,9 @@ from telegram import Update
 from telegram.ext import (
     ApplicationBuilder,
     CommandHandler,
-    ContextTypes,
     MessageHandler,
-    filters
+    ContextTypes,
+    filters,
 )
 
 BOT_TOKEN = "8093048850:AAHFyMUXZKlawgJzoTJg89g06uUuUpLBn78"
@@ -29,25 +29,24 @@ async def join(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"Klik link ini untuk join channel resmi kami 👇\n\n🔥 {CHANNEL_LINK}"
     )
 
-# Handler buat menampilkan file_id
-async def get_file_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    msg = update.message
-    if not msg:
+# === Handler untuk ambil file_id ===
+async def on_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not update.message or not update.message.photo:
         return
+    file_id = update.message.photo[-1].file_id
+    await update.message.reply_text(f"📸 file_id:\n`{file_id}`", parse_mode="Markdown")
 
-    if msg.photo:
-        fid = msg.photo[-1].file_id
-        kind = "📸 photo"
-    elif msg.video:
-        fid = msg.video.file_id
-        kind = "🎥 video"
-    elif msg.document:
-        fid = msg.document.file_id
-        kind = f"📄 document ({msg.document.mime_type})"
-    else:
+async def on_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not update.message or not update.message.video:
         return
+    file_id = update.message.video.file_id
+    await update.message.reply_text(f"🎬 file_id:\n`{file_id}`", parse_mode="Markdown")
 
-    await msg.reply_text(f"{kind} file_id:\n`{fid}`", parse_mode="Markdown")
+async def on_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not update.message or not update.message.document:
+        return
+    file_id = update.message.document.file_id
+    await update.message.reply_text(f"📄 file_id:\n`{file_id}`", parse_mode="Markdown")
 
 async def on_startup(app):
     try:
@@ -58,9 +57,16 @@ async def on_startup(app):
 
 def main():
     app = ApplicationBuilder().token(BOT_TOKEN).build()
+
+    # Commands
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("join", join))
-    app.add_handler(MessageHandler(filters.PHOTO | filters.VIDEO | filters.Document.ALL, get_file_id))
+
+    # Message handlers untuk ambil file_id
+    app.add_handler(MessageHandler(filters.PHOTO, on_photo))
+    app.add_handler(MessageHandler(filters.VIDEO, on_video))
+    app.add_handler(MessageHandler(filters.Document.ALL, on_document))
+
     app.post_init = on_startup
     app.run_polling(allowed_updates=Update.ALL_TYPES)
 

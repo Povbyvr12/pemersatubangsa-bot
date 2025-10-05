@@ -1,14 +1,9 @@
 import logging
 from telegram import Update
-from telegram.ext import (
-    ApplicationBuilder,
-    CommandHandler,
-    MessageHandler,
-    ContextTypes,
-    filters,
-)
+from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
 
 BOT_TOKEN = "8093048850:AAHFyMUXZKlawgJzoTJg89g06uUuUpLBn78"
+CHANNEL_ID = "-100248813868"
 CHANNEL_LINK = "https://t.me/+FBO14eOGdi45OTRl"
 
 logging.basicConfig(
@@ -17,40 +12,38 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# --- command /start ---
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "Halo! 🔥 Selamat datang di bot resmi PEMERSATU BANGSA 💕\n\n"
-        "Untuk lihat file & konten terbaru, pastikan kamu sudah join channel resmi kami dulu ya 👇\n\n"
-        f"{CHANNEL_LINK}"
+        "Untuk lihat file & konten terbaru, pastikan kamu sudah join channel resmi kami dulu ya 👇",
+        reply_markup={
+            "inline_keyboard": [
+                [{"text": "🔥 Join Channel", "url": CHANNEL_LINK}],
+                [{"text": "✅ Sudah Join", "callback_data": "check_join"}],
+            ]
+        }
     )
 
-# --- command /join ---
 async def join(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
-        f"Klik link ini untuk join channel resmi kami 👇\n\n🔥 {CHANNEL_LINK}"
-    )
+    await update.message.reply_text(f"Klik link ini untuk join channel resmi kami 👇\n\n🔥 {CHANNEL_LINK}")
 
-# --- ambil file_id (foto, video, dokumen) ---
-async def handle_media(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.message.photo:
-        file_id = update.message.photo[-1].file_id
-        kind = "📸 Foto"
-    elif update.message.video:
-        file_id = update.message.video.file_id
-        kind = "🎬 Video"
-    elif update.message.document:
-        file_id = update.message.document.file_id
-        kind = "📄 Dokumen"
-    else:
+async def on_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not update.message or not update.message.photo:
         return
+    file_id = update.message.photo[-1].file_id
+    await update.message.reply_text(f"📸 file_id:\n`{file_id}`", parse_mode="Markdown")
 
-    await update.message.reply_text(
-        f"{kind} file_id kamu adalah:\n<code>{file_id}</code>",
-        parse_mode="HTML"
-    )
+async def on_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not update.message or not update.message.video:
+        return
+    file_id = update.message.video.file_id
+    await update.message.reply_text(f"🎬 file_id:\n`{file_id}`", parse_mode="Markdown")
 
-# --- saat bot mulai ---
+async def on_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not update.message or not update.message.document:
+        return
+    file_id = update.message.document.file_id
+    await update.message.reply_text(f"📄 file_id:\n`{file_id}`", parse_mode="Markdown")
+
 async def on_startup(app):
     try:
         await app.bot.delete_webhook(drop_pending_updates=True)
@@ -58,17 +51,13 @@ async def on_startup(app):
     except Exception:
         logger.exception("Gagal delete_webhook")
 
-# --- main program ---
 def main():
     app = ApplicationBuilder().token(BOT_TOKEN).build()
-
-    # Command handlers
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("join", join))
-
-    # Media handler (buat ambil file_id)
-    app.add_handler(MessageHandler(filters.PHOTO | filters.VIDEO | filters.Document.ALL, handle_media))
-
+    app.add_handler(MessageHandler(filters.PHOTO, on_photo))
+    app.add_handler(MessageHandler(filters.VIDEO, on_video))
+    app.add_handler(MessageHandler(filters.Document.ALL, on_document))
     app.post_init = on_startup
     app.run_polling(allowed_updates=Update.ALL_TYPES)
 

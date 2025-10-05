@@ -1,16 +1,19 @@
 import logging
 import asyncio
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.constants import ChatMemberStatus, ChatAction
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ChatAction
 from telegram.ext import (
-    ApplicationBuilder, CommandHandler, MessageHandler,
-    CallbackQueryHandler, ContextTypes, filters
+    ApplicationBuilder,
+    CommandHandler,
+    MessageHandler,
+    CallbackQueryHandler,
+    ContextTypes,
+    filters,
 )
 
 # ============== KONFIG ==============
 BOT_TOKEN = "8093048850:AAHFyMUXZKlawgJzoTJg89g06uUuUpLBn78"
 
-# Pakai USERNAME channel (paling stabil)
+# Pakai USERNAME channel (lebih stabil)
 CHANNEL_USERNAME = "@pemersatubangsa13868"
 CHANNEL_JOIN_URL = "https://t.me/pemersatubangsa13868"
 
@@ -33,6 +36,7 @@ def kb() -> InlineKeyboardMarkup:
         [InlineKeyboardButton("✅ Sudah Join", callback_data="joined")],
     ])
 
+# /start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "Halo! 🔥 Selamat datang di bot resmi pemersatubangsa168138 💕\n\n"
@@ -40,30 +44,22 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=kb()
     )
 
+# /join
 async def join_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("Silakan join channel dulu ya 👇", reply_markup=kb())
 
-async def _has_joined(context: ContextTypes.DEFAULT_TYPE, user_id: int) -> tuple[bool, str|None]:
-    """
-    Cek status member di channel berbasis USERNAME.
-    Return (joined, err_text)
-    """
+# fungsi cek join
+async def check_join(context: ContextTypes.DEFAULT_TYPE, user_id: int) -> tuple[bool, str | None]:
     try:
         member = await context.bot.get_chat_member(CHANNEL_USERNAME, user_id)
-        status = member.status
-        if status in (
-            ChatMemberStatus.MEMBER,
-            ChatMemberStatus.ADMINISTRATOR,
-            ChatMemberStatus.CREATOR,
-            ChatMemberStatus.RESTRICTED,
-        ):
+        status = getattr(member, "status", "")
+        if status in ("member", "administrator", "creator", "restricted"):
             return True, None
-        # status LEFT / KICKED dll -> belum join
         return False, None
     except Exception as e:
-        # Simpan error singkat buat debug
         return False, f"{type(e).__name__}: {e}"
 
+# tombol "Sudah Join"
 async def handle_joined(update: Update, context: ContextTypes.DEFAULT_TYPE):
     cq = update.callback_query
     user = update.effective_user
@@ -74,40 +70,28 @@ async def handle_joined(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception:
         pass
 
-    # Retry lebih panjang biar stabil (mis. user baru join 1-2 detik lalu)
-    last_err = None
-    joined = False
-    for _ in range(6):  # 6x
-        joined, err_txt = await _has_joined(context, user.id)
-        if joined:
-            break
-        last_err = err_txt
-        await asyncio.sleep(2)
-
-    # tutup loading tombol
-    await cq.answer()
+    joined, err_txt = await check_join(context, user.id)
 
     if not joined:
-        # Kalau errornya jelas bukan "belum join", tampilkan short debug
-        extra = f"\n\n(Info teknis: {last_err})" if last_err else ""
+        extra = f"\n\n(Info teknis: {err_txt})" if err_txt else ""
+        await cq.answer()
         await cq.message.reply_text(
-            "❌ Kamu belum join channel utama! Silakan join dulu ya 👇" + extra,
+            f"❌ Kamu belum join channel utama! Silakan join dulu ya 👇{extra}",
             reply_markup=kb(),
         )
         return
 
-    # Sudah join -> kirim konten
+    # Sudah join → kirim konten
+    await cq.answer()
     try:
         for fid in FILE_IDS:
             await context.bot.send_photo(chat_id=chat_id, photo=fid)
         await cq.message.reply_text("🔥 Terima kasih sudah join! Ini konten spesialnya 💕")
     except Exception as e:
-        logger.exception("Gagal kirim konten")
-        await cq.message.reply_text(
-            "⚠️ Ada kendala saat kirim konten. Coba /start lalu tekan 'Sudah Join' lagi ya."
-        )
+        logger.exception(f"Gagal kirim konten: {e}")
+        await cq.message.reply_text("⚠️ Ada kendala saat kirim konten, coba /start lagi.")
 
-# Kirim file_id saat owner mengirim media ke bot (buat nyatet FILE_IDS baru)
+# kirim file_id kalau owner kirim media
 async def handle_media(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.message
     if not msg:
@@ -125,14 +109,7 @@ async def handle_media(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     await msg.reply_text(f"{kind} file_id:\n<code>{fid}</code>", parse_mode="HTML")
 
-# Opsional: /debug_join buat cek statusmu sekarang
-async def debug_join(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    ok, err = await _has_joined(context, update.effective_user.id)
-    txt = "JOINED ✅" if ok else "NOT JOINED ❌"
-    if err:
-        txt += f"\n(Info teknis: {err})"
-    await update.message.reply_text(txt)
-
+# startup
 async def on_startup(app):
     try:
         await app.bot.delete_webhook(drop_pending_updates=True)
@@ -144,7 +121,6 @@ def main():
     app = ApplicationBuilder().token(BOT_TOKEN).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("join", join_cmd))
-    app.add_handler(CommandHandler("debug_join", debug_join))  # opsional
     app.add_handler(CallbackQueryHandler(handle_joined, pattern=r"^joined$"))
     app.add_handler(MessageHandler(filters.PHOTO | filters.VIDEO | filters.Document.ALL, handle_media))
     app.post_init = on_startup

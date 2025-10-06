@@ -118,7 +118,7 @@ async def handle_joined(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 logger.warning(f"Gagal kirim konten awal ke {chat_id}: {e}")
         _append_id(INIT_SENT_FILE, user.id)
 
-    await cq.message.reply_text("🔥 Terima kasih sudah join! Konten baru akan dikirim otomatis setiap 2 jam 💕")
+    await cq.message.reply_text("🔥 Terima kasih sudah join! langsung klik kontennya dan nikmati servicenya bersama kami 💕")
 
 
 # ==== Broadcast Loop (WIB) ====

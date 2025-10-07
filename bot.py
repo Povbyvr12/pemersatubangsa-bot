@@ -1,6 +1,6 @@
 import logging
 import asyncio
-from datetime import datetime, timedelta
+from datetime import datetime
 from zoneinfo import ZoneInfo
 from pathlib import Path
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
@@ -15,8 +15,8 @@ BOT_TOKEN = "8093048850:AAHFyMUXZKlawgJzoTJg89g06uUuUpLBn78"
 CHANNEL_USERNAME = "@pemersatubangsa13868"
 CHANNEL_JOIN_URL = "https://t.me/pemersatubangsa13868"
 
-# username pemilik bot (tanpa @) -> pesan random dari akun ini TIDAK dibalas
-OWNER_USERNAME = "Harukasakurakaharuno"
+# >>>>> ISI INI: ID TELEGRAM KAMU (ANGKA)
+OWNER_ID = 000000000  # <- ganti dengan ID kamu. Sementara boleh 0; lalu pakai /id untuk lihat angka & update.
 
 # 2 konten awal (sekali saat lolos join)
 FILE_IDS = [
@@ -49,6 +49,10 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# ---------- helper ----------
+def is_owner(update: Update) -> bool:
+    u = update.effective_user
+    return bool(u and OWNER_ID and u.id == OWNER_ID)
 
 def kb():
     return InlineKeyboardMarkup([
@@ -56,19 +60,16 @@ def kb():
         [InlineKeyboardButton("✅ Sudah Join", callback_data="joined")],
     ])
 
-
 def _read_ids(path: Path):
     if not path.exists():
         return set()
     return {int(x) for x in path.read_text().splitlines() if x.strip().isdigit()}
-
 
 def _append_id(path: Path, uid: int):
     ids = _read_ids(path)
     if uid not in ids:
         with path.open("a") as f:
             f.write(f"{uid}\n")
-
 
 async def _has_joined(context, user_id: int):
     try:
@@ -79,23 +80,29 @@ async def _has_joined(context, user_id: int):
         logger.warning(f"get_chat_member error: {e}")
         return False
 
-
-# ==== Commands ====
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+# ---------- commands ----------
+async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "Halo! 🔥 Selamat datang di bot resmi pemersatubangsa168138 💕\n\n"
         "Untuk lihat file & konten terbaru, pastikan kamu sudah join channel resmi kami dulu ya 👇",
         reply_markup=kb()
     )
 
+async def cmd_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # bantu kamu lihat ID numerik sekali, lalu isi ke OWNER_ID
+    await update.message.reply_text(f"ID kamu: <code>{update.effective_user.id}</code>", parse_mode="HTML")
 
+# ---------- callback tombol ----------
 async def handle_joined(update: Update, context: ContextTypes.DEFAULT_TYPE):
     cq = update.callback_query
     user = update.effective_user
     chat_id = user.id
 
     await cq.answer()
-    await context.bot.send_chat_action(chat_id=chat_id, action=ChatAction.TYPING)
+    try:
+        await context.bot.send_chat_action(chat_id=chat_id, action=ChatAction.TYPING)
+    except Exception:
+        pass
 
     # cek join (maks 3x)
     ok = False
@@ -111,6 +118,7 @@ async def handle_joined(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     _append_id(USERS_FILE, user.id)
 
+    # kirim 2 konten awal (sekali per user)
     sent_init = _read_ids(INIT_SENT_FILE)
     if user.id not in sent_init:
         for fid in FILE_IDS:
@@ -123,14 +131,26 @@ async def handle_joined(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await cq.message.reply_text("🔥 Terima kasih sudah join! langsung klik kontennya dan nikmati servicenya bersama kami 💕")
 
-
-# ==== Auto reply saat user kirim chat random (kecuali OWNER) ====
-async def fallback_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user = update.effective_user
-    # abaikan pesan dari bot & owner (berdasar username)
-    if user and (user.is_bot or (user.username or "").lower() == OWNER_USERNAME.lower()):
+# ---------- owner-only: balas file_id ----------
+async def owner_media_echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # dipanggil hanya kalau is_owner True (lihat filter di bawah)
+    msg = update.message
+    if msg.photo:
+        fid = msg.photo[-1].file_id
+        kind = "📸 Photo"
+    elif msg.video:
+        fid = msg.video.file_id
+        kind = "🎬 Video"
+    elif msg.document:
+        fid = msg.document.file_id
+        kind = "📄 Document"
+    else:
         return
+    await msg.reply_text(f"{kind} file_id:\n<code>{fid}</code>", parse_mode="HTML")
 
+# ---------- auto-reply user biasa ----------
+async def fallback_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # akan terpasang untuk user biasa saja (owner di-exclude)
     await update.message.reply_text(
         "Halo kak 👋\n"
         "Ada yang bisa dibantu?\n\n"
@@ -139,8 +159,7 @@ async def fallback_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "Kalau sudah, kabari di sini untuk konfirmasi ya kak 😊"
     )
 
-
-# ==== Broadcast Loop (WIB) ====
+# ---------- broadcast loop ----------
 async def broadcast_loop(app):
     await asyncio.sleep(5)
     last_hour = None
@@ -154,18 +173,14 @@ async def broadcast_loop(app):
                 content = DAILY_CONTENTS[(hour // 2) % len(DAILY_CONTENTS)]
                 fid = content["file_id"]
                 caption = content.get("caption")
-
-                logger.info(f"[{now.strftime('%H:%M')}] Kirim ke {len(users)} user...")
                 for uid in users:
                     try:
                         await app.bot.send_photo(chat_id=uid, photo=fid, caption=caption)
                         await asyncio.sleep(0.4)
                     except Exception as e:
                         logger.warning(f"Gagal kirim ke {uid}: {e}")
-
                 last_hour = hour
         await asyncio.sleep(30)
-
 
 async def on_startup(app):
     try:
@@ -174,24 +189,35 @@ async def on_startup(app):
         pass
     asyncio.create_task(broadcast_loop(app))
 
-
-# ==== Main ====
+# ---------- main ----------
 def main():
     app = ApplicationBuilder().token(BOT_TOKEN).build()
-    app.add_handler(CommandHandler("start", start))
+
+    # Commands
+    app.add_handler(CommandHandler("start", cmd_start))
+    app.add_handler(CommandHandler("id", cmd_id))  # untuk melihat ID kamu
+
+    # Tombol
     app.add_handler(CallbackQueryHandler(handle_joined, pattern=r"^joined$"))
 
-    # auto-reply untuk chat random di PRIVATE
-    app.add_handler(
-        MessageHandler(
-            filters.ChatType.PRIVATE & ~filters.COMMAND,
-            fallback_reply
-        )
+    # OWNER: dapatkan file_id saat kirim media (owner di-allow saja)
+    owner_media_filter = (
+        filters.ChatType.PRIVATE
+        & (filters.PHOTO | filters.VIDEO | filters.Document.ALL)
+        & filters.User(user_id=OWNER_ID)  # hanya owner
     )
+    app.add_handler(MessageHandler(owner_media_filter, owner_media_echo))
+
+    # USER BIASA: auto-reply di private chat, exclude owner & exclude command
+    normal_user_filter = (
+        filters.ChatType.PRIVATE
+        & ~filters.COMMAND
+        & ~filters.User(user_id=OWNER_ID)
+    )
+    app.add_handler(MessageHandler(normal_user_filter, fallback_reply))
 
     app.post_init = on_startup
     app.run_polling(allowed_updates=Update.ALL_TYPES)
-
 
 if __name__ == "__main__":
     main()

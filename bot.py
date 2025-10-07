@@ -19,9 +19,9 @@ CHANNEL_JOIN_URL = "https://t.me/pemersatubangsa13868"
 OWNER_ID = 6950357678
 
 # 2 konten awal (sekali saat lolos join)
-FILE_IDS = [
-    "AgACAgUAAxkBAAN3aOIv1uuLkn96kWkJ6tF0Qcst7kcAAlAMaxuuWhFXY5A63iHcezABAAMCAAN4AAM2BA",
+FILE_IDS = [ 
     "AgACAgUAAxkBAAOBaOJFbIZvqFO5hzpXEmoayF4zeK0AAh8LaxuuWhlXxyDFA-MZjn8BAAMCAAN4AAM2BA",
+    "BAACAgUAAxkBAAIBBWjkpL1LfFmrGiUdVTFJ5ibHzFWrAAKOFQAC6AUhVzOeILjcYHP_NgQ",
 ]
 
 # 2 konten harian (bergantian tiap kirim)

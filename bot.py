@@ -15,11 +15,11 @@ BOT_TOKEN = "8093048850:AAHFyMUXZKlawgJzoTJg89g06uUuUpLBn78"
 CHANNEL_USERNAME = "@pemersatubangsa13868"
 CHANNEL_JOIN_URL = "https://t.me/pemersatubangsa13868"
 
-# >>>>> ISI INI: ID TELEGRAM KAMU (ANGKA)
+# >>>>> ID TELEGRAM KAMU (ANGKA)
 OWNER_ID = 6950357678
 
 # 2 konten awal (sekali saat lolos join)
-FILE_IDS = [ 
+FILE_IDS = [
     "AgACAgUAAxkBAAIBB2jkpt40E_SfUR4yrYygPa6gufjiAAKfDGsb6AUhV6IWb_b9CD_7AQADAgADeQADNgQ",
     "BAACAgUAAxkBAAIBBWjkpL1LfFmrGiUdVTFJ5ibHzFWrAAKOFQAC6AUhVzOeILjcYHP_NgQ",
 ]
@@ -61,19 +61,16 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-
 def kb() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
         [InlineKeyboardButton("🔥 Join Channel", url=CHANNEL_JOIN_URL)],
         [InlineKeyboardButton("✅ Sudah Join", callback_data="joined")],
     ])
 
-
 def _read_ids(path: Path) -> set[int]:
     if not path.exists():
         return set()
     return {int(x) for x in path.read_text().splitlines() if x.strip().isdigit()}
-
 
 def _append_id(path: Path, uid: int):
     ids = _read_ids(path)
@@ -81,16 +78,41 @@ def _append_id(path: Path, uid: int):
         with path.open("a") as f:
             f.write(f"{uid}\n")
 
-
 async def _has_joined(context: ContextTypes.DEFAULT_TYPE, user_id: int) -> bool:
     try:
-        member = await context.bot.get_chat_member(CHANNEL_USERNAME, user_id)
-        status = getattr(member, "status", "")
+        m = await context.bot.get_chat_member(CHANNEL_USERNAME, user_id)
+        status = getattr(m, "status", "")
         return status in ("member", "administrator", "creator", "owner", "restricted")
     except Exception as e:
         logger.warning(f"get_chat_member error: {e}")
         return False
 
+# === Helper: kirim media apa pun dari file_id (foto/video/gif/dokumen)
+async def send_any_media(bot, chat_id: int, file_id: str, caption: str | None = None):
+    # 1) coba sebagai PHOTO
+    try:
+        await bot.send_photo(chat_id=chat_id, photo=file_id, caption=caption)
+        return
+    except Exception:
+        pass
+    # 2) coba sebagai VIDEO
+    try:
+        await bot.send_video(chat_id=chat_id, video=file_id, caption=caption)
+        return
+    except Exception:
+        pass
+    # 3) coba sebagai ANIMATION (GIF)
+    try:
+        await bot.send_animation(chat_id=chat_id, animation=file_id, caption=caption)
+        return
+    except Exception:
+        pass
+    # 4) terakhir sebagai DOCUMENT
+    try:
+        await bot.send_document(chat_id=chat_id, document=file_id, caption=caption)
+        return
+    except Exception as e:
+        logger.warning(f"Gagal kirim media {file_id} ke {chat_id}: {e}")
 
 # ==== Commands ====
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -99,7 +121,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "Untuk lihat file & konten terbaru, pastikan kamu sudah join channel resmi kami dulu ya 👇",
         reply_markup=kb()
     )
-
 
 async def handle_joined(update: Update, context: ContextTypes.DEFAULT_TYPE):
     cq = update.callback_query
@@ -126,25 +147,21 @@ async def handle_joined(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     _append_id(USERS_FILE, user.id)
 
+    # kirim konten awal (bisa foto/video/gif/dokumen)
     sent_init = _read_ids(INIT_SENT_FILE)
     if user.id not in sent_init:
         for fid in FILE_IDS:
-            try:
-                await context.bot.send_photo(chat_id=chat_id, photo=fid)
-                await asyncio.sleep(0.5)
-            except Exception as e:
-                logger.warning(f"Gagal kirim konten awal ke {chat_id}: {e}")
+            await send_any_media(context.bot, chat_id, fid)
+            await asyncio.sleep(0.4)
         _append_id(INIT_SENT_FILE, user.id)
 
     await cq.message.reply_text(
         "🔥 Terima kasih sudah join! langsung klik kontennya dan nikmati servicenya bersama kami 💕"
     )
 
-
 # ==== Auto reply saat user kirim chat random (kecuali OWNER) ====
 async def fallback_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user and update.effective_user.id == OWNER_ID:
-        # Jangan balas apa pun ke owner
         return
     await update.message.reply_text(
         "Halo kak 👋\n"
@@ -153,7 +170,6 @@ async def fallback_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "👉 https://heylink.me/kedai168login/\n\n"
         "Kalau sudah, kabari di sini untuk konfirmasi ya kak 😊"
     )
-
 
 # ==== Handler media: kirim file_id hanya ke OWNER ====
 async def handle_media(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -173,13 +189,15 @@ async def handle_media(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif getattr(msg, "video", None):
         file_id = msg.video.file_id
         kind = "🎬 Video"
+    elif getattr(msg, "animation", None):
+        file_id = msg.animation.file_id
+        kind = "🖼 GIF/Animation"
     elif getattr(msg, "document", None):
         file_id = msg.document.file_id
         kind = "📄 Document"
 
     if file_id:
         await msg.reply_text(f"{kind} file_id:\n<code>{file_id}</code>", parse_mode="HTML")
-
 
 # ==== Broadcast Loop (WIB) ====
 async def broadcast_loop(app):
@@ -199,6 +217,7 @@ async def broadcast_loop(app):
                 logger.info(f"[{now.strftime('%H:%M')}] Kirim ke {len(users)} user...")
                 for uid in users:
                     try:
+                        # konten harian kamu adalah foto, jadi tetap send_photo
                         await app.bot.send_photo(chat_id=uid, photo=fid, caption=caption)
                         await asyncio.sleep(0.4)
                     except Exception as e:
@@ -207,14 +226,12 @@ async def broadcast_loop(app):
                 last_hour = hour
         await asyncio.sleep(30)
 
-
 async def on_startup(app):
     try:
         await app.bot.delete_webhook(drop_pending_updates=True)
     except Exception:
         pass
     asyncio.create_task(broadcast_loop(app))
-
 
 # ==== Main ====
 def main():
@@ -228,7 +245,7 @@ def main():
     app.add_handler(
         MessageHandler(
             filters.ChatType.PRIVATE
-            & (filters.PHOTO | filters.VIDEO | filters.Document.ALL),
+            & (filters.PHOTO | filters.VIDEO | filters.Document.ALL | filters.ANIMATION),
             handle_media
         )
     )
@@ -243,7 +260,6 @@ def main():
 
     app.post_init = on_startup
     app.run_polling(allowed_updates=Update.ALL_TYPES)
-
 
 if __name__ == "__main__":
     main()

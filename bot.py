@@ -15,6 +15,9 @@ BOT_TOKEN = "8093048850:AAHFyMUXZKlawgJzoTJg89g06uUuUpLBn78"
 CHANNEL_USERNAME = "@pemersatubangsa13868"
 CHANNEL_JOIN_URL = "https://t.me/pemersatubangsa13868"
 
+# username pemilik bot (tanpa @) -> pesan random dari akun ini TIDAK dibalas
+OWNER_USERNAME = "Harukasakurakaharuno"
+
 # 2 konten awal (sekali saat lolos join)
 FILE_IDS = [
     "AgACAgUAAxkBAAN3aOIv1uuLkn96kWkJ6tF0Qcst7kcAAlAMaxuuWhFXY5A63iHcezABAAMCAAN4AAM2BA",
@@ -121,8 +124,13 @@ async def handle_joined(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await cq.message.reply_text("🔥 Terima kasih sudah join! langsung klik kontennya dan nikmati servicenya bersama kami 💕")
 
 
-# ==== Auto reply saat user kirim chat random ====
+# ==== Auto reply saat user kirim chat random (kecuali OWNER) ====
 async def fallback_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    # abaikan pesan dari bot & owner (berdasar username)
+    if user and (user.is_bot or (user.username or "").lower() == OWNER_USERNAME.lower()):
+        return
+
     await update.message.reply_text(
         "Halo kak 👋\n"
         "Ada yang bisa dibantu?\n\n"
@@ -173,7 +181,7 @@ def main():
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CallbackQueryHandler(handle_joined, pattern=r"^joined$"))
 
-    # tambahkan auto-reply
+    # auto-reply untuk chat random di PRIVATE
     app.add_handler(
         MessageHandler(
             filters.ChatType.PRIVATE & ~filters.COMMAND,
